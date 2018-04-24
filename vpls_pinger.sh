@@ -2,9 +2,9 @@
 
 date=$(TZ=UTC date '+%Y-%m-%d %H:%M')
 
-## Net-00
+## Defined hosts which you want ping tests to be executed from
 #Dub
-dub=admin1.dub1.zdsys.com
+dub=admin1.dub1
 #fra
 fra7=admin1.pod7
 fra11=admin1.pod11
