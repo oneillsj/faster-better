@@ -1,0 +1,169 @@
+#Controls a servo connected to a rasberry pi
+
+import tornado.ioloop
+import tornado.web
+import tornado.autoreload
+from tornado import ioloop, gen
+from tornado.queues import Queue
+
+import RPi.GPIO as GPIO
+import time
+
+import os
+import sys
+import psutil
+import logging
+
+import datetime
+
+import requests
+from redis import Redis
+from rq import Queue
+
+from derp_test import getm
+
+q = Queue(connection=Redis())
+
+
+GPIO.setwarnings(False)
+
+GPIO.setmode(GPIO.BCM)
+
+LED=17
+BUTTON=18
+
+onTime=1200 #20mins
+
+GPIO.setup(BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LED, GPIO.OUT)
+
+# listens for physical button input
+def servl():
+        try:
+                while True:
+                                input_state = GPIO.input(BUTTON)
+                                if input_state == False:
+                                                print('Button Pressed')
+                                                GPIO.output(LED,True)
+                                                moveL()
+                                                #time.sleep(5)
+                                                time.sleep(onTime)
+                                                moveL()
+                                                GPIO.output(LED,False)
+        except (KeyboardInterrupt, ValueError):
+                GPIO.cleanup()
+                print "Error or Key interupt000rz! - servl process"
+
+
+# Moves Servo
+def moveL ():
+        SERVO=22
+        GPIO.setup(SERVO,GPIO.OUT)
+        p = GPIO.PWM(SERVO,50)
+
+        #GPIO.output(LED,True)
+        #p.start(8.4) #neutral
+        p.start(9.1)
+        time.sleep(0.5)
+        p.ChangeDutyCycle(3.5) #180 Degress, park it
+        time.sleep(1)
+        p.stop()
+        print datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        #GPIO.output(LED,False)
+
+# ON button webapp
+class on(tornado.web.RequestHandler):
+        @gen.coroutine
+        def get(self):
+                #led.on()
+                GPIO.output(LED,True)
+                moveL()
+                print datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                print "Heating ON for 10 minutes"
+                #self.write("Heating ON for 10 minutes")
+                #time.sleep(5)
+                yield gen.sleep(onTime)
+                #time.sleep(1800)
+                print datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                print "Heating OFF"
+                moveL()
+                GPIO.output(LED,False)
+                self.write("Heating has been on for 10 minutes")
+
+#ON/OFF button webapp
+class off(tornado.web.RequestHandler):
+        def get(self):
+                moveL()
+                print "Heating ON/OFF"
+                self.write("Heating switched ON/OFF")
+
+#timer webapp
+class timer(tornado.web.RequestHandler):
+        print "are you timmeererering?"
+        q.enqueue_call(getm)
+
+#timer webapp
+#class timer(tornado.web.RequestHandler):
+#       @gen.coroutine
+#       def get(self):
+#               hour = self.get_argument("timer", "")
+#               print hour +" Hours"
+#               hour = int(hour)
+#               tSecs = hour * 3600
+#               print "sleeping for ... "+ str(tSecs) +" Seconds"
+#               GPIO.output(LED,True)
+#               self.write("Timer ON")
+#               yield gen.sleep(tSecs)
+#               #time.sleep(tSecs)
+#               #time.sleep(10)
+#
+#               moveL()
+#               print "Heating now ON after " + str(tSecs) + " seconds"
+#               yield gen.sleep(onTime)
+#               #time.sleep(1800)
+#               moveL()
+#               GPIO.output(LED,False)
+#               self.write("Heating was ON for 10 minutes after timer")
+#               print "Heating was ON for 10mins after timer"
+
+#cancel webapp - cancel all tasks/restarts app
+class cancel(tornado.web.RequestHandler):
+        def get(self):
+                """Restarts the current program, with file objects and descriptors
+                cleanup
+                """
+
+                try:
+                        p = psutil.Process(os.getpid())
+                        print p
+                        for handler in p.get_open_files() + p.connections():
+                                os.close(handler.fd)
+                except Exception, e:
+                        logging.error(e)
+
+                #python = sys.executable
+                python = derp3.py
+                print python
+                os.execl(python, python, *sys.argv)
+
+application = tornado.web.Application([
+        (r"/on", on),
+        (r"/off", off),
+        (r"/timer", timer),
+        (r"/cancel", cancel),
+        (r"/(.*)", tornado.web.StaticFileHandler, {"path": ".","default_filename": "index.html"}),
+])
+
+try:
+        if __name__ == "__main__":
+                application.listen(8080,"0.0.0.0")
+                Process(target=servl).start()
+
+                tornado.ioloop.IOLoop.instance().start()
+
+                print gen.get_event_loop()
+
+
+except (KeyboardInterrupt, ValueError):
+    GPIO.cleanup()
+    print "Error or Key interrupt - Entire"
