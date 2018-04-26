@@ -1,4 +1,4 @@
-#Controls a servo connected to a rasberry pi
+#Web App Controller for a servo connected to a rasberry pi
 
 import tornado.ioloop
 import tornado.web
